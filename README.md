@@ -1,6 +1,6 @@
 # LifeTiles
 
-**A smart, customizable digital display for time, weather, quotes, tasks, and personal messages.**
+**A Smart, Customizable Digital Display for Time, Weather, Quotes, Tasks, Image/Animation, and Personal Messages**
 
 Firmware for the [Waveshare ESP32-S3-Touch-LCD-4.3](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3) (800×480 RGB touch panel). The UI is built with **LVGL 8** and **PlatformIO**. When Wi‑Fi is connected, a built-in web server lets you manage photos, to-dos, and messages from a phone or PC on your local network.
 

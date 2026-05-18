@@ -1,0 +1,10 @@
+#pragma once
+
+/* Copy to wifi_config.h for local build defaults (wifi_config.h is gitignored). */
+#ifndef WIFI_SSID
+#define WIFI_SSID "YOUR_WIFI_SSID"
+#endif
+
+#ifndef WIFI_PASSWORD
+#define WIFI_PASSWORD ""
+#endif

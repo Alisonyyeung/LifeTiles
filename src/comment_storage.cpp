@@ -246,6 +246,17 @@ bool comment_storage_has_message(void)
     return LittleFS.exists(COMMENT_PATH);
 }
 
+bool comment_storage_clear(void)
+{
+    if (LittleFS.exists(COMMENT_PATH)) {
+        LittleFS.remove(COMMENT_PATH);
+    }
+    if (LittleFS.exists(COMMENT_TIME_PATH)) {
+        LittleFS.remove(COMMENT_TIME_PATH);
+    }
+    return true;
+}
+
 bool comment_storage_load_ex(char *buf, size_t buf_len, time_t *received_at)
 {
     if (received_at) {

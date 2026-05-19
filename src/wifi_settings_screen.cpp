@@ -29,6 +29,30 @@ static lv_obj_t *wifi_card;
 static lv_point_t swipe_start;
 static bool screen_ready = false;
 
+static void wifi_clear_widget_ptrs(void)
+{
+    screen = NULL;
+    label_title = NULL;
+    label_hint = NULL;
+    label_status = NULL;
+    ta_ssid = NULL;
+    ta_password = NULL;
+    sw_show_password = NULL;
+    history_list = NULL;
+    keyboard = NULL;
+    btn_save = NULL;
+    lbl_save = NULL;
+    wifi_card = NULL;
+}
+
+static void wifi_settings_screen_unloaded_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_SCREEN_UNLOADED) {
+        return;
+    }
+    wifi_settings_screen_destroy();
+}
+
 static void refresh_history_list(void);
 
 static void hide_keyboard(void)
@@ -396,7 +420,26 @@ void wifi_settings_screen_init(void)
     lv_obj_add_event_cb(keyboard, on_keyboard_event, LV_EVENT_CANCEL, NULL);
     lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
 
+    lv_obj_add_event_cb(screen, wifi_settings_screen_unloaded_cb, LV_EVENT_ALL, NULL);
     screen_ready = true;
+}
+
+bool wifi_settings_screen_is_ready(void)
+{
+    return screen_ready;
+}
+
+void wifi_settings_screen_destroy(void)
+{
+    if (!screen_ready) {
+        return;
+    }
+    screen_ready = false;
+    hide_keyboard();
+    if (screen) {
+        lv_obj_del(screen);
+    }
+    wifi_clear_widget_ptrs();
 }
 
 lv_obj_t *wifi_settings_screen_get_screen(void)

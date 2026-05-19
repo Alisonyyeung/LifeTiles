@@ -7,6 +7,8 @@ extern "C" {
 #endif
 
 void todo_screen_create(lv_obj_t *parent);
+void todo_screen_destroy(void);
+bool todo_screen_is_ready(void);
 void todo_screen_show(void);
 lv_obj_t *todo_screen_get_root(void);
 void todo_screen_refresh(void);

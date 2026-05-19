@@ -144,8 +144,8 @@ static void fit_image_to_screen(lv_obj_t *img_obj)
 
 static bool load_kind(int kind)
 {
-    if (kind == s_loaded) {
-        return s_pixels != NULL;
+    if (kind == s_loaded && s_pixels != NULL) {
+        return true;
     }
 
     release_background();
@@ -171,6 +171,16 @@ static bool load_kind(int kind)
 void weather_background_init(void)
 {
     release_background();
+}
+
+void weather_background_release_decoded(void)
+{
+    if (s_pixels) {
+        jpg_decode_release(s_pixels);
+    }
+    s_pixels = NULL;
+    memset(&s_dsc, 0, sizeof(s_dsc));
+    /* Keep s_loaded so apply() can reload the same asset without re-picking paths. */
 }
 
 void weather_background_apply(lv_obj_t *img_obj, int weather_code, bool is_day)

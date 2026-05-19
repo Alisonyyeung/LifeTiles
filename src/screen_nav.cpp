@@ -21,6 +21,30 @@ static lv_obj_t *tile_image;
 static lv_obj_t *tile_comment;
 static lv_obj_t *tile_todo;
 
+static void screen_nav_destroy_inactive_tiles(lv_obj_t *active_tile)
+{
+    if (active_tile != tile_comment) {
+        comment_screen_destroy();
+    }
+    if (active_tile != tile_image) {
+        image_screen_destroy();
+    }
+    if (active_tile != tile_todo) {
+        todo_screen_destroy();
+    }
+}
+
+static void screen_nav_ensure_tile(lv_obj_t *tile)
+{
+    if (tile == tile_comment && !comment_screen_is_ready()) {
+        comment_screen_create(tile_comment);
+    } else if (tile == tile_image && !image_screen_is_ready()) {
+        image_screen_create(tile_image);
+    } else if (tile == tile_todo && !todo_screen_is_ready()) {
+        todo_screen_create(tile_todo);
+    }
+}
+
 static void update_image_playback(void)
 {
     if (!tileview || !tile_image) {
@@ -40,7 +64,10 @@ static void on_tileview_changed(lv_event_t *e)
     if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) {
         return;
     }
-    if (tile_todo && lv_tileview_get_tile_act(tileview) == tile_todo) {
+    lv_obj_t *active = lv_tileview_get_tile_act(tileview);
+    screen_nav_destroy_inactive_tiles(active);
+    screen_nav_ensure_tile(active);
+    if (tile_todo && active == tile_todo) {
         todo_screen_refresh();
     }
     update_image_playback();
@@ -64,10 +91,7 @@ void screen_nav_init(void)
     tile_image = lv_tileview_add_tile(tileview, 2, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
     tile_todo = lv_tileview_add_tile(tileview, 3, 0, LV_DIR_LEFT);
 
-    comment_screen_create(tile_comment);
     main_screen_create(tile_main);
-    image_screen_create(tile_image);
-    todo_screen_create(tile_todo);
 
     lv_obj_add_flag(tile_comment, LV_OBJ_FLAG_EVENT_BUBBLE);
     lv_obj_add_flag(tile_main, LV_OBJ_FLAG_EVENT_BUBBLE);
@@ -172,11 +196,15 @@ void screen_nav_show_wifi_settings(void)
 
 void screen_nav_show_image(void)
 {
+    screen_nav_ensure_tile(tile_image);
+    screen_nav_destroy_inactive_tiles(tile_image);
     go_to_tile(tile_image);
 }
 
 void screen_nav_show_comment(void)
 {
+    screen_nav_ensure_tile(tile_comment);
+    screen_nav_destroy_inactive_tiles(tile_comment);
     comment_screen_refresh_message();
     go_to_tile(tile_comment);
 }
@@ -186,6 +214,8 @@ void screen_nav_show_todo(void)
     if (!tile_todo) {
         return;
     }
+    screen_nav_ensure_tile(tile_todo);
+    screen_nav_destroy_inactive_tiles(tile_todo);
     todo_screen_refresh();
     go_to_tile(tile_todo);
 }

@@ -7,6 +7,8 @@ extern "C" {
 #endif
 
 void wifi_settings_screen_init(void);
+void wifi_settings_screen_destroy(void);
+bool wifi_settings_screen_is_ready(void);
 void wifi_settings_screen_show(void);
 lv_obj_t *wifi_settings_screen_get_screen(void);
 void wifi_settings_screen_apply_theme(void);

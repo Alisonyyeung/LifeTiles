@@ -9,6 +9,7 @@
 
 #include "jpg_decode.h"
 #include "ESP_Panel_Conf.h"
+#include <esp_heap_caps.h>
 
 #define SEQ_MAGIC     "MYSEQ1"
 #define SEQ_MAGIC2    "MYSEQ2"
@@ -177,19 +178,22 @@ static bool seq_decode_frame_at(seq_anim_t *s, uint32_t *out_delay_ms)
         return false;
     }
 
-    uint8_t *jpeg = (uint8_t *)malloc(jlen);
+    uint8_t *jpeg = (uint8_t *)heap_caps_malloc(jlen, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!jpeg) {
+        jpeg = (uint8_t *)heap_caps_malloc(jlen, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    }
     if (!jpeg) {
         return false;
     }
     if (s->file.read(jpeg, jlen) != (int)jlen) {
-        free(jpeg);
+        heap_caps_free(jpeg);
         return false;
     }
 
     lv_img_dsc_t decoded;
     uint8_t *decoded_pixels = NULL;
     const bool ok = jpg_decode_memory(jpeg, jlen, &decoded, &decoded_pixels);
-    free(jpeg);
+    heap_caps_free(jpeg);
 
     if (!ok || !decoded_pixels) {
         return false;

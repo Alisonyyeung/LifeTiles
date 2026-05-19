@@ -8,6 +8,7 @@
 #include "lvgl_port.h"
 #include "main_screen.h"
 #include "quotes_api.h"
+#include "weather_api.h"
 #include "wifi_storage.h"
 
 #define HK_TIMEZONE    "HKT-8"
@@ -44,6 +45,7 @@ static void connected_services_task(void *arg)
 
     image_upload_server_restart();
     quotes_api_request(QUOTE_FETCH_TODAY);
+    weather_api_request_refresh();
 
     vTaskDelete(NULL);
 }

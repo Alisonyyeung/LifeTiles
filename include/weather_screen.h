@@ -18,6 +18,8 @@ typedef struct {
 } weather_hourly_slot_t;
 
 void weather_screen_init(void);
+void weather_screen_destroy(void);
+bool weather_screen_is_ready(void);
 void weather_screen_show(void);
 lv_obj_t *weather_screen_get_screen(void);
 
@@ -31,6 +33,10 @@ void weather_screen_set_forecast_day(int index, const char *day_label, int weath
                                      float temp_max_c, float temp_min_c, bool is_day);
 void weather_screen_set_forecast_count(int day_count);
 void weather_screen_apply_theme(void);
+/** Free weather JPEG/RGB buffer before TLS (see net_prepare_https). */
+void weather_screen_release_heavy_memory(void);
+/** Reload background after HTTPS if weather data was shown. */
+void weather_screen_restore_background_memory(void);
 
 #define WEATHER_FORECAST_LABEL_MAX 32
 

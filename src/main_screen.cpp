@@ -618,9 +618,6 @@ void main_screen_create(lv_obj_t *parent)
     lv_obj_center(img_likes_btn);
     app_theme_style_icon_btn(btn_likes, NULL);
 
-    weather_screen_init();
-    settings_screen_init();
-    wifi_settings_screen_init();
     menu_screen_init();
 
     lv_obj_t *hint_menu = lv_label_create(screen);

@@ -27,6 +27,8 @@
 #define WEATHER_HEADER_ON_DARK     0xFFFFFF
 #define WEATHER_PULL_REFRESH_PX    48
 #define WEATHER_PULL_DEBOUNCE_MS   3000
+/** Solid backdrop while fetching (no photo JPEG yet). */
+#define WEATHER_REFRESH_BG         0xA8D4F0
 
 typedef struct {
     uint32_t bg;
@@ -72,6 +74,44 @@ static lv_obj_t *forecast_page_swipe_hint;
 static bool screen_ready = false;
 static int forecast_page_count = WEATHER_FORECAST_DAYS;
 static uint32_t s_last_pull_refresh_ms = 0;
+
+static void weather_clear_widget_ptrs(void)
+{
+    screen = NULL;
+    img_background = NULL;
+    label_title = NULL;
+    label_hint = NULL;
+    current_panel = NULL;
+    forecast_panel = NULL;
+    label_forecast_header = NULL;
+    label_forecast_swipe = NULL;
+    label_forecast_page = NULL;
+    img_current_icon = NULL;
+    label_current_heading = NULL;
+    label_current_temp = NULL;
+    label_current_desc = NULL;
+    label_current_humidity = NULL;
+    label_current_wind = NULL;
+    forecast_viewport = NULL;
+    today_hourly_list = NULL;
+    forecast_page_swipe_hint = NULL;
+    for (int i = 0; i < WEATHER_FORECAST_DAYS; ++i) {
+        forecast_pages[i] = NULL;
+        forecast_summary[i] = NULL;
+        forecast_page_day[i] = NULL;
+        forecast_page_icon[i] = NULL;
+        forecast_page_temp[i] = NULL;
+        forecast_page_desc[i] = NULL;
+    }
+}
+
+static void weather_screen_unloaded_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_SCREEN_UNLOADED) {
+        return;
+    }
+    weather_screen_destroy();
+}
 
 static const weather_palette_t *weather_palette(void)
 {
@@ -162,7 +202,7 @@ static lv_obj_t *create_hourly_section(lv_obj_t *parent, lv_coord_t w, const wea
 }
 
 static void fill_hourly_list(lv_obj_t *list, const weather_hourly_slot_t *slots, int count,
-                             const weather_palette_t *p)
+                             const weather_palette_t *p, bool show_empty_message)
 {
     if (!list) {
         return;
@@ -171,9 +211,11 @@ static void fill_hourly_list(lv_obj_t *list, const weather_hourly_slot_t *slots,
     lv_obj_clean(list);
 
     if (!slots || count <= 0) {
-        lv_obj_t *empty = lv_label_create(list);
-        lv_label_set_text(empty, "No hourly data");
-        style_text_on_panel(empty, p, &lv_font_montserrat_14, p->text_muted, LV_TEXT_ALIGN_CENTER);
+        if (show_empty_message) {
+            lv_obj_t *empty = lv_label_create(list);
+            lv_label_set_text(empty, "No hourly data");
+            style_text_on_panel(empty, p, &lv_font_montserrat_14, p->text_muted, LV_TEXT_ALIGN_CENTER);
+        }
         return;
     }
 
@@ -217,6 +259,20 @@ static bool weather_uses_day_background(int weather_code, bool is_day)
 static bool weather_has_photo_background(void)
 {
     return img_background && !lv_obj_has_flag(img_background, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void apply_refresh_background(void)
+{
+    if (!screen_ready || !screen) {
+        return;
+    }
+    if (img_background) {
+        lv_img_set_src(img_background, NULL);
+        lv_obj_add_flag(img_background, LV_OBJ_FLAG_HIDDEN);
+    }
+    weather_background_release_decoded();
+    lv_obj_set_style_bg_color(screen, lv_color_hex(WEATHER_REFRESH_BG), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
 }
 
 static void apply_weather_appearance(bool is_day)
@@ -295,6 +351,7 @@ static void forecast_pull_refresh_event(lv_event_t *e)
     s_last_pull_refresh_ms = now;
 
     Serial.println("Weather: pull-to-refresh");
+    weather_screen_set_loading();
     weather_api_request_refresh();
     lv_obj_scroll_to_y(page, 0, LV_ANIM_ON);
 }
@@ -510,7 +567,26 @@ void weather_screen_init(void)
         forecast_pages[i] = create_forecast_page(forecast_viewport, i);
     }
 
+    lv_obj_add_event_cb(screen, weather_screen_unloaded_cb, LV_EVENT_ALL, NULL);
     screen_ready = true;
+}
+
+bool weather_screen_is_ready(void)
+{
+    return screen_ready;
+}
+
+void weather_screen_destroy(void)
+{
+    if (!screen_ready) {
+        return;
+    }
+    screen_ready = false;
+    weather_background_release_decoded();
+    if (screen) {
+        lv_obj_del(screen);
+    }
+    weather_clear_widget_ptrs();
 }
 
 lv_obj_t *weather_screen_get_screen(void)
@@ -536,6 +612,8 @@ void weather_screen_show(void)
 
     if (weather_api_has_cached_data()) {
         weather_api_apply_cached_to_ui();
+    } else if (weather_api_fetch_in_progress()) {
+        weather_screen_set_loading();
     } else {
         weather_screen_set_loading();
         lv_label_set_text(label_current_desc, "Swipe down on forecast to refresh");
@@ -547,20 +625,29 @@ void weather_screen_set_loading(void)
     if (!screen_ready) {
         return;
     }
+    apply_refresh_background();
+
+    const weather_palette_t *card_p = &s_palettes[0];
+    style_weather_card(current_panel, card_p->card);
+    style_weather_card(forecast_panel, card_p->card);
+
     lv_img_set_src(img_current_icon, &weather_img_unknown);
-    lv_label_set_text(label_current_temp, "-°C");
-    lv_label_set_text(label_current_desc, "Loading...");
+    lv_label_set_text(label_current_temp, "...");
+    lv_label_set_text(label_current_desc, "Updating...");
     lv_label_set_text(label_current_humidity, "");
     lv_label_set_text(label_current_wind, "");
+    style_text_on_panel(label_current_temp, card_p, &lv_font_montserrat_48, card_p->text_primary,
+                        LV_TEXT_ALIGN_CENTER);
+    style_text_on_panel(label_current_desc, card_p, &lv_font_montserrat_20, card_p->text_muted,
+                        LV_TEXT_ALIGN_CENTER);
+
     for (int i = 0; i < WEATHER_FORECAST_DAYS; ++i) {
-        lv_label_set_text(forecast_page_day[i], "-");
+        lv_label_set_text(forecast_page_day[i], "");
         lv_img_set_src(forecast_page_icon[i], &weather_img_unknown);
-        lv_label_set_text(forecast_page_desc[i], "-");
-        lv_label_set_text(forecast_page_temp[i], "-");
+        lv_label_set_text(forecast_page_desc[i], "");
+        lv_label_set_text(forecast_page_temp[i], "");
     }
-    const weather_palette_t *card_p =
-        weather_has_photo_background() ? &s_palettes[0] : weather_palette();
-    fill_hourly_list(today_hourly_list, NULL, 0, card_p);
+    fill_hourly_list(today_hourly_list, NULL, 0, card_p, false);
     if (forecast_pages[0]) {
         lv_obj_scroll_to_y(forecast_pages[0], 0, LV_ANIM_OFF);
     }
@@ -607,7 +694,7 @@ void weather_screen_set_today_hourly(const weather_hourly_slot_t *slots, int cou
     }
     const weather_palette_t *card_p =
         weather_has_photo_background() ? &s_palettes[0] : weather_palette();
-    fill_hourly_list(today_hourly_list, slots, count, card_p);
+    fill_hourly_list(today_hourly_list, slots, count, card_p, true);
     if (forecast_pages[0]) {
         lv_obj_t *content = lv_obj_get_child(forecast_pages[0], 0);
         if (content) {
@@ -660,4 +747,22 @@ void weather_screen_apply_theme(void)
         weather_background_apply(img_background, s_current_weather_code, s_day_appearance);
         apply_weather_appearance(s_day_appearance);
     }
+}
+
+void weather_screen_release_heavy_memory(void)
+{
+    if (!screen_ready || !img_background) {
+        return;
+    }
+    lv_img_set_src(img_background, NULL);
+    weather_background_release_decoded();
+}
+
+void weather_screen_restore_background_memory(void)
+{
+    if (!screen_ready || !img_background) {
+        return;
+    }
+    weather_background_apply(img_background, s_current_weather_code, s_day_appearance);
+    apply_weather_appearance(s_day_appearance);
 }

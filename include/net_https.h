@@ -3,6 +3,8 @@
 #include <Arduino.h>
 
 #define NET_HTTPS_BODY_MAX  (128 * 1024)
+/** Contiguous internal DRAM needed for WiFiClientSecure + mbedTLS handshake. */
+#define NET_SSL_MIN_INTERNAL_BLOCK  (36 * 1024)
 
 /**
  * GET over HTTPS into a PSRAM buffer (mutex, heap wait, retries).
@@ -16,3 +18,6 @@ bool net_https_get_ex(const char *url, char **out_body, size_t *out_len, uint32_
 
 /** Wait until internal heap can satisfy TLS (used before HTTPS and after large fetches). */
 bool net_https_wait_heap(size_t min_internal_block, uint32_t wait_ms);
+
+/** Log heap, drop image viewer RAM, wait for TLS — call before HTTPS when .seq/images were shown. */
+void net_prepare_https(size_t min_internal_block);

@@ -294,6 +294,31 @@ void todo_screen_create(lv_obj_t *parent)
     screen_ready = true;
 }
 
+bool todo_screen_is_ready(void)
+{
+    return screen_ready;
+}
+
+void todo_screen_destroy(void)
+{
+    if (!screen_ready || !tile_root) {
+        return;
+    }
+    if (s_encourage_timer) {
+        lv_timer_del(s_encourage_timer);
+        s_encourage_timer = NULL;
+    }
+    if (s_encourage_banner) {
+        lv_obj_del(s_encourage_banner);
+        s_encourage_banner = NULL;
+    }
+    screen_ready = false;
+    lv_obj_clean(tile_root);
+    label_title = NULL;
+    label_hint = NULL;
+    list_scroll = NULL;
+}
+
 lv_obj_t *todo_screen_get_root(void)
 {
     return tile_root;

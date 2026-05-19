@@ -48,8 +48,8 @@ struct SpiRamAllocator {
 
 using WeatherJsonDocument = BasicJsonDocument<SpiRamAllocator>;
 #define WEATHER_HTTP_TIMEOUT       20000
-#define WEATHER_SSL_MIN_HEAP       (20 * 1024)
-#define WEATHER_POST_FETCH_DELAY_MS 400
+#define WEATHER_SSL_MIN_HEAP       NET_SSL_MIN_INTERNAL_BLOCK
+#define WEATHER_POST_FETCH_DELAY_MS 600
 
 static weather_lvgl_lock_fn s_lvgl_lock;
 static weather_lvgl_unlock_fn s_lvgl_unlock;
@@ -76,6 +76,7 @@ typedef struct {
 } weather_cache_t;
 
 static weather_cache_t s_cache;
+static volatile bool s_fetch_in_progress = false;
 
 static void lvgl_lock(void)
 {
@@ -159,6 +160,11 @@ static void push_cache_to_ui(void)
     }
 
     main_screen_set_weather_icon_ex(s_cache.current_code, s_cache.is_day);
+
+    if (!weather_screen_is_ready()) {
+        return;
+    }
+
     weather_screen_set_current(s_cache.current_code, s_cache.current_temp, s_cache.humidity,
                                s_cache.wind_kmh, s_cache.is_day);
     for (int i = 0; i < s_cache.day_count; ++i) {
@@ -176,6 +182,11 @@ static void push_cache_to_ui(void)
 bool weather_api_has_cached_data(void)
 {
     return s_cache.valid;
+}
+
+bool weather_api_fetch_in_progress(void)
+{
+    return s_fetch_in_progress;
 }
 
 void weather_api_apply_cached_to_ui(void)
@@ -302,6 +313,8 @@ static bool apply_weather_from_doc(WeatherJsonDocument &doc)
 
 static bool fetch_hong_kong_weather(void)
 {
+    net_prepare_https(WEATHER_SSL_MIN_HEAP);
+
     char *body = nullptr;
     size_t body_len = 0;
     if (!net_https_get_ex(WEATHER_API_URL, &body, &body_len, WEATHER_HTTP_TIMEOUT, WEATHER_SSL_MIN_HEAP)) {
@@ -352,10 +365,13 @@ static void weather_worker_task(void *arg)
             continue;
         }
 
+        s_fetch_in_progress = true;
+
         if (!wifi_ready()) {
             lvgl_lock();
             weather_screen_set_error("Wi-Fi not connected");
             lvgl_unlock();
+            s_fetch_in_progress = false;
             continue;
         }
 
@@ -363,6 +379,7 @@ static void weather_worker_task(void *arg)
         weather_screen_set_loading();
         lvgl_unlock();
 
+        Serial.println("Weather: fetching forecast");
         if (!fetch_hong_kong_weather()) {
             if (!s_cache.valid) {
                 lvgl_lock();
@@ -370,6 +387,8 @@ static void weather_worker_task(void *arg)
                 lvgl_unlock();
             }
         }
+
+        s_fetch_in_progress = false;
     }
 }
 
@@ -398,6 +417,11 @@ void weather_api_request_refresh(void)
     if (!s_weather_queue) {
         return;
     }
+    if (s_fetch_in_progress) {
+        return;
+    }
     const uint8_t trigger = 1;
-    xQueueSend(s_weather_queue, &trigger, 0);
+    if (xQueueSend(s_weather_queue, &trigger, 0) == pdTRUE) {
+        s_fetch_in_progress = true;
+    }
 }

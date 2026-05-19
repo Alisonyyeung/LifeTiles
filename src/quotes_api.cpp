@@ -185,9 +185,13 @@ static void notify_done(quote_fetch_kind_t kind, bool success)
 
 static bool http_fetch_quote(const char *url, String &content, String &author)
 {
+    net_prepare_https(NET_SSL_MIN_INTERNAL_BLOCK);
+
     char *body = nullptr;
     size_t body_len = 0;
-    if (!net_https_get(url, &body, &body_len, QUOTE_HTTP_TIMEOUT_MS)) {
+    const bool got =
+        net_https_get_ex(url, &body, &body_len, QUOTE_HTTP_TIMEOUT_MS, NET_SSL_MIN_INTERNAL_BLOCK);
+    if (!got) {
         return false;
     }
 

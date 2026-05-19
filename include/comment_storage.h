@@ -55,6 +55,8 @@ bool comment_storage_load(char *buf, size_t buf_len);
 bool comment_storage_load_ex(char *buf, size_t buf_len, time_t *received_at);
 bool comment_storage_load_display(comment_display_t *display);
 bool comment_storage_has_message(void);
+/** Remove saved message and timestamp; display meta is kept. */
+bool comment_storage_clear(void);
 
 #ifdef __cplusplus
 }

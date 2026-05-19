@@ -46,6 +46,44 @@ static lv_obj_t *settings_scroll;
 
 static bool screen_ready = false;
 
+static void settings_clear_widget_ptrs(void)
+{
+    screen = NULL;
+    label_title = NULL;
+    label_ip_value = NULL;
+    label_gateway_value = NULL;
+    label_subnet_value = NULL;
+    sw_static_ip = NULL;
+    ta_static_ip = NULL;
+    ta_static_gw = NULL;
+    ta_static_sn = NULL;
+    label_static_status = NULL;
+    btn_save_static = NULL;
+    lbl_save_static = NULL;
+    label_wifi_saved = NULL;
+    label_brightness_value = NULL;
+    slider_brightness = NULL;
+    btn_wifi = NULL;
+    lbl_wifi_btn = NULL;
+    btn_theme_dark = NULL;
+    lbl_theme_dark = NULL;
+    btn_theme_light = NULL;
+    lbl_theme_light = NULL;
+    label_theme_hint = NULL;
+    ta_username = NULL;
+    keyboard = NULL;
+    settings_card = NULL;
+    settings_scroll = NULL;
+}
+
+static void settings_screen_unloaded_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_SCREEN_UNLOADED) {
+        return;
+    }
+    settings_screen_destroy();
+}
+
 static void hide_keyboard(void);
 
 static bool static_field_empty(const char *s)
@@ -725,7 +763,27 @@ void settings_screen_init(void)
     lv_obj_add_flag(keyboard, LV_OBJ_FLAG_HIDDEN);
 
     update_theme_buttons();
+
+    lv_obj_add_event_cb(screen, settings_screen_unloaded_cb, LV_EVENT_ALL, NULL);
     screen_ready = true;
+}
+
+bool settings_screen_is_ready(void)
+{
+    return screen_ready;
+}
+
+void settings_screen_destroy(void)
+{
+    if (!screen_ready) {
+        return;
+    }
+    screen_ready = false;
+    hide_keyboard();
+    if (screen) {
+        lv_obj_del(screen);
+    }
+    settings_clear_widget_ptrs();
 }
 
 lv_obj_t *settings_screen_get_screen(void)

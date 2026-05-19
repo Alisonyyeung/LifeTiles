@@ -8,15 +8,15 @@ Firmware for the [Waveshare ESP32-S3-Touch-LCD-4.3](https://www.waveshare.com/wi
 
 ## Features
 
-| Area | What you get |
-|------|----------------|
-| **Home** | Greeting with your name, live clock (HKT), daily quote (Quotable), weather shortcut, liked quotes |
-| **Image** | Slideshow of photos/animations from LittleFS (JPEG, PNG, WebP, GIF→`.seq`) |
-| **To-Do** | Up to 10 tasks on-device; sync via web API |
-| **Message** | Styled personal message board (dialogue, festive, love, warning), emoji, marquee |
-| **Weather** | 7-day forecast + hourly strip (Open-Meteo, no API key) |
-| **Settings** | Wi‑Fi (saved networks, static IP), brightness, dark/light theme, display name |
-| **Web UI** | Upload images, edit message & todos, preview storage — at `http://<device-ip>/` |
+| Area         | What you get                                                                                      |
+| ------------ | ------------------------------------------------------------------------------------------------- |
+| **Home**     | Greeting with your name, live clock (HKT), daily quote (Quotable), weather shortcut, liked quotes |
+| **Image**    | Slideshow of photos/animations from LittleFS (JPEG, PNG, WebP, GIF→`.seq`)                        |
+| **To-Do**    | Up to 10 tasks on-device; sync via web API                                                        |
+| **Message**  | Styled personal message board (dialogue, festive, love, warning), emoji, marquee                  |
+| **Weather**  | 7-day forecast + hourly strip (Open-Meteo, no API key)                                            |
+| **Settings** | Wi‑Fi (saved networks, static IP), brightness, dark/light theme, display name                     |
+| **Web UI**   | Upload images, edit message & todos, preview storage — at `http://<device-ip>/`                   |
 
 ---
 
@@ -44,15 +44,15 @@ Four main tiles live in a horizontal **LVGL tileview**. Swipe left/right between
                               swipe →
 ```
 
-| Screen | Tile / access | Highlights |
-|--------|----------------|------------|
-| **Home** | Center tile (default) | Time, quote (shuffle / today), double-tap to like, heart list, settings & weather buttons |
-| **Image** | Swipe right from Home | Cycle images; animated `.seq` from GIFs; tap for viewer |
-| **To-Do** | Swipe right from Image | Check off tasks; encouragement on complete |
-| **Message** | Swipe left from Home | Bubble styles, font size, scroll/marquee, colored emoji |
-| **Weather** | Menu or Home → weather icon | Forecast, backgrounds, Google-style icons |
-| **Settings** | Menu or Home → gear | Wi‑Fi, static IP, brightness, theme, username |
-| **Wi‑Fi** | Settings → edit Wi‑Fi | SSID/password, up to 3 saved networks, show-password toggle |
+| Screen       | Tile / access               | Highlights                                                                                |
+| ------------ | --------------------------- | ----------------------------------------------------------------------------------------- |
+| **Home**     | Center tile (default)       | Time, quote (shuffle / today), double-tap to like, heart list, settings & weather buttons |
+| **Image**    | Swipe right from Home       | Cycle images; animated `.seq` from GIFs; tap for viewer                                   |
+| **To-Do**    | Swipe right from Image      | Check off tasks; encouragement on complete                                                |
+| **Message**  | Swipe left from Home        | Bubble styles, font size, scroll/marquee, colored emoji                                   |
+| **Weather**  | Menu or Home → weather icon | Forecast, backgrounds, Google-style icons                                                 |
+| **Settings** | Menu or Home → gear         | Wi‑Fi, static IP, brightness, theme, username                                             |
+| **Wi‑Fi**    | Settings → edit Wi‑Fi       | SSID/password, up to 3 saved networks, show-password toggle                               |
 
 Overlay screens (Settings, Weather, Wi‑Fi) slide in from the right; close control returns to the tileview.
 
@@ -109,18 +109,18 @@ Image upload UI: http://<ip>/
 
 Open that URL in a browser on the same LAN.
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/` | GET | Main web UI (upload, gallery, message, todos) |
-| `/ping` | GET | Health check |
-| `/upload` | POST | Upload image (multipart) |
-| `/api/storage` | GET | Storage usage |
-| `/api/preview` | GET | Thumbnail/preview |
-| `/api/select` | POST | Set active slideshow image |
-| `/api/delete`, `/api/delete_bulk` | POST | Remove files |
-| `/api/rename` | POST | Rename file |
-| `/api/comment` | GET/POST | Read/write message board |
-| `/api/todos` | GET/POST | Read/write to-do list (JSON) |
+| Endpoint                          | Method   | Purpose                                       |
+| --------------------------------- | -------- | --------------------------------------------- |
+| `/`                               | GET      | Main web UI (upload, gallery, message, todos) |
+| `/ping`                           | GET      | Health check                                  |
+| `/upload`                         | POST     | Upload image (multipart)                      |
+| `/api/storage`                    | GET      | Storage usage                                 |
+| `/api/preview`                    | GET      | Thumbnail/preview                             |
+| `/api/select`                     | POST     | Set active slideshow image                    |
+| `/api/delete`, `/api/delete_bulk` | POST     | Remove files                                  |
+| `/api/rename`                     | POST     | Rename file                                   |
+| `/api/comment`                    | GET/POST | Read/write message board                      |
+| `/api/todos`                      | GET/POST | Read/write to-do list (JSON)                  |
 
 On connect, the firmware syncs **NTP** (Hong Kong time), fetches **today’s quote**, and restarts the HTTP server so the IP stays correct after network changes.
 
@@ -130,29 +130,29 @@ On connect, the firmware syncs **NTP** (Hong Kong time), fetches **today’s quo
 
 ### NVS (Preferences, namespace `myscreen`)
 
-| Key / area | Content |
-|------------|---------|
-| `wifi_ssid`, `wifi_pass` | Active Wi‑Fi credentials |
-| `wifi_st_*` | Static IP enable, IP, gateway, subnet |
-| `wifi_st_pv` | Flag: reprovision static IP after SSID change |
-| `img_sel` | Last selected image basename |
-| `qt_*` | Cached “quote of the day” |
-| `username` | Display name for greeting |
-| `theme`, `brightness` | UI preferences |
+| Key / area               | Content                                       |
+| ------------------------ | --------------------------------------------- |
+| `wifi_ssid`, `wifi_pass` | Active Wi‑Fi credentials                      |
+| `wifi_st_*`              | Static IP enable, IP, gateway, subnet         |
+| `wifi_st_pv`             | Flag: reprovision static IP after SSID change |
+| `img_sel`                | Last selected image basename                  |
+| `qt_*`                   | Cached “quote of the day”                     |
+| `username`               | Display name for greeting                     |
+| `theme`, `brightness`    | UI preferences                                |
 
 Wi‑Fi passwords are **not** stored in source code; optional compile-time defaults live in `include/wifi_config.h` (use placeholders for git).
 
 ### LittleFS (on-device flash filesystem)
 
-| Path | Content |
-|------|---------|
-| `/images/` | Uploaded photos; optional `*_scaled.*` from `tools/prepare_images.py` |
-| `/todos.json` | To-do list (max 10 tasks) |
-| `/comment.txt` | Message text |
-| `/comment_meta.json` | Style, font size, scroll, festive color |
-| `/comment_at.txt` | Message timestamp |
-| `/liked_quotes.json` | Up to 10 liked quotes |
-| `/wifi_hist.json` | Up to 3 saved Wi‑Fi networks (SSID + password) |
+| Path                 | Content                                                               |
+| -------------------- | --------------------------------------------------------------------- |
+| `/images/`           | Uploaded photos; optional `*_scaled.*` from `tools/prepare_images.py` |
+| `/todos.json`        | To-do list (max 10 tasks)                                             |
+| `/comment.txt`       | Message text                                                          |
+| `/comment_meta.json` | Style, font size, scroll, festive color                               |
+| `/comment_at.txt`    | Message timestamp                                                     |
+| `/liked_quotes.json` | Up to 10 liked quotes                                                 |
+| `/wifi_hist.json`    | Up to 3 saved Wi‑Fi networks (SSID + password)                        |
 
 GIF animations should be converted to **`.seq`** (see `tools/gif_to_seq.py`) for smooth playback.
 
@@ -220,24 +220,24 @@ Default forecast is **Hong Kong** (`latitude=22.32`, `longitude=114.17` in `src/
 
 ## Developer tools (`tools/`)
 
-| Script | Purpose |
-|--------|---------|
-| `prepare_images.py` | Scale/optimize images under `data/images` for upload |
-| `prepare_weather_backgrounds.py` | Prepare weather background JPEGs |
-| `gif_to_seq.py` | Convert GIF → `.seq` animation for the image screen |
-| `gen_google_weather_icons.py` | Regenerate embedded weather icons |
-| `gen_comment_*.py` | Emoji fonts, CJK font, bubble decorations |
+| Script                           | Purpose                                              |
+| -------------------------------- | ---------------------------------------------------- |
+| `prepare_images.py`              | Scale/optimize images under `data/images` for upload |
+| `prepare_weather_backgrounds.py` | Prepare weather background JPEGs                     |
+| `gif_to_seq.py`                  | Convert GIF → `.seq` animation for the image screen  |
+| `gen_google_weather_icons.py`    | Regenerate embedded weather icons                    |
+| `gen_comment_*.py`               | Emoji fonts, CJK font, bubble decorations            |
 
 ---
 
 ## Configuration highlights
 
-| File | Role |
-|------|------|
-| `platformio.ini` | Board, 8 MB flash, LittleFS, lib deps (LVGL, ArduinoJson, libwebp, JPEGDEC) |
-| `lib/lv_conf.h` | LVGL features (fonts, imgfont, etc.) |
-| `lib/ESP_Panel_Conf.h` | Resolution 800×480, RGB bus, touch |
-| `partitions/myscreen_8MB.csv` | App + LittleFS partition sizes |
+| File                          | Role                                                                        |
+| ----------------------------- | --------------------------------------------------------------------------- |
+| `platformio.ini`              | Board, 8 MB flash, LittleFS, lib deps (LVGL, ArduinoJson, libwebp, JPEGDEC) |
+| `lib/lv_conf.h`               | LVGL features (fonts, imgfont, etc.)                                        |
+| `lib/ESP_Panel_Conf.h`        | Resolution 800×480, RGB bus, touch                                          |
+| `partitions/myscreen_8MB.csv` | App + LittleFS partition sizes                                              |
 
 ---
 
@@ -261,13 +261,13 @@ Default forecast is **Hong Kong** (`latitude=22.32`, `longitude=114.17` in `src/
 
 ## Troubleshooting
 
-| Issue | Things to try |
-|-------|----------------|
-| Upload fails | BOOT + RESET sequence; check USB port and driver |
-| Blank display | Verify `ESP_Panel_Conf.h` matches your board revision |
-| No Wi‑Fi | Set network in Settings; check 2.4 GHz; serial log for errors |
-| Web UI unreachable | Same LAN as device; use IP from serial log after connect |
-| GIF won’t animate | Convert to `.seq` with `tools/gif_to_seq.py` and upload to `/images/` |
-| Quotes/weather empty | Wait for NTP; confirm internet access after Wi‑Fi connects |
+| Issue                | Things to try                                                         |
+| -------------------- | --------------------------------------------------------------------- |
+| Upload fails         | BOOT + RESET sequence; check USB port and driver                      |
+| Blank display        | Verify `ESP_Panel_Conf.h` matches your board revision                 |
+| No Wi‑Fi             | Set network in Settings; check 2.4 GHz; serial log for errors         |
+| Web UI unreachable   | Same LAN as device; use IP from serial log after connect              |
+| GIF won’t animate    | Convert to `.seq` with `tools/gif_to_seq.py` and upload to `/images/` |
+| Quotes/weather empty | Wait for NTP; confirm internet access after Wi‑Fi connects            |
 
 Feedback and contributions welcome.

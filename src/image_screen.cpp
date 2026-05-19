@@ -15,6 +15,7 @@
 #include "app_theme.h"
 #include "image_storage.h"
 #include "nav_gestures.h"
+#include "screen_nav.h"
 #include "jpg_decode.h"
 #include "lvgl_port.h"
 #include "seq_anim.h"
@@ -36,6 +37,7 @@ static bool is_seq_viewer = false;
 static uint8_t *decoded_pixel_buf = NULL;
 static lv_img_dsc_t decoded_img_dsc;
 static bool playback_wanted = false;
+static bool screen_ready = false;
 /** Basename of file currently shown (LittleFS path tail); empty if none. */
 static char s_open_basename[64];
 
@@ -373,6 +375,14 @@ static void apply_gif_playback(void)
     }
 }
 
+void image_screen_release_heavy_memory(void)
+{
+    if (!screen_ready) {
+        return;
+    }
+    clear_viewer();
+}
+
 void image_screen_set_playback(bool play)
 {
     playback_wanted = play;
@@ -470,7 +480,7 @@ static void show_path(const char *path)
     if (!is_seq_viewer) {
         lv_obj_set_style_bg_opa(viewer_holder, LV_OPA_TRANSP, LV_PART_MAIN);
     }
-    apply_default_view();
+    apply_fit_view();
     apply_gif_playback();
     lv_obj_add_event_cb(viewer_widget, on_viewer_area_click, LV_EVENT_CLICKED, NULL);
     image_bubble_nav(viewer_widget);
@@ -503,6 +513,10 @@ static void on_btn_next(lv_event_t *e)
 
 void image_screen_create(lv_obj_t *parent)
 {
+    if (screen_ready || !parent) {
+        return;
+    }
+
     tile_root = parent;
     lv_obj_clear_flag(tile_root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(tile_root, lv_color_hex(0x000000), LV_PART_MAIN);
@@ -560,6 +574,36 @@ void image_screen_create(lv_obj_t *parent)
     style_image_chrome_buttons();
 
     image_screen_refresh();
+    screen_ready = true;
+}
+
+bool image_screen_is_ready(void)
+{
+    return screen_ready;
+}
+
+void image_screen_destroy(void)
+{
+    if (!screen_ready || !tile_root) {
+        return;
+    }
+    screen_ready = false;
+    playback_wanted = false;
+    clear_viewer();
+    if (chrome_hide_timer) {
+        lv_timer_del(chrome_hide_timer);
+        chrome_hide_timer = NULL;
+    }
+    lv_obj_clean(tile_root);
+    viewer_holder = NULL;
+    viewer_widget = NULL;
+    label_empty = NULL;
+    label_name = NULL;
+    btn_next = NULL;
+    lbl_next = NULL;
+    btn_fit = NULL;
+    lbl_fit = NULL;
+    s_open_basename[0] = '\0';
 }
 
 void image_screen_show_next(void)
@@ -612,7 +656,10 @@ void image_screen_dispatch_pending(void)
     if (job == IMG_PENDING_REFRESH) {
         image_storage_rescan();
     }
-    image_screen_show_current();
+    screen_nav_show_image();
+    if (image_screen_is_ready()) {
+        image_screen_show_current();
+    }
     lvgl_port_unlock();
 }
 
@@ -629,7 +676,7 @@ bool image_screen_is_gif_active(void)
 
 void image_screen_apply_theme(void)
 {
-    if (!tile_root) {
+    if (!screen_ready || !tile_root) {
         return;
     }
     const app_theme_colors_t *c = app_theme_colors();

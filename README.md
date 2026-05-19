@@ -79,6 +79,7 @@ LifeTiles/
 ├── include/                # Public headers
 ├── data/                   # LittleFS assets (weather icons, backgrounds, …)
 ├── partitions/             # 8 MB flash layout
+├── docs/images/            # README screenshots (web UI demos)
 ├── tools/                  # Image/weather/font prep scripts
 ├── lib/
 │   ├── lv_conf.h           # LVGL configuration
@@ -108,6 +109,22 @@ Image upload UI: http://<ip>/
 ```
 
 Open that URL in a browser on the same LAN.
+
+### Web UI demos
+
+The built-in page at `http://<device-ip>/` lets you manage content without reflashing firmware.
+
+**Message board** — compose text, pick emoji, bubble style (dialogue, festive, love letter, warning), font size, and motion; post to the **Message** tile on the device.
+
+![Message board web UI](docs/images/web-message-board.png)
+
+**To-Do list** — add, edit, delete, and check off tasks (max 10). Changes sync with the on-screen list.
+
+![To-Do list web UI](docs/images/web-todo-list.png)
+
+**Image & animation upload** — upload JPEG, PNG, WebP, BMP, GIF, or `.seq` files; preview storage; tap a thumbnail to show it on the **Image** tile (GIFs are converted to `.seq` in the browser).
+
+![Image upload and gallery web UI](docs/images/web-image-upload.png)
 
 | Endpoint                          | Method   | Purpose                                       |
 | --------------------------------- | -------- | --------------------------------------------- |

@@ -282,7 +282,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MyScreen</title>
+<title>LifeTiles</title>
 <style>
 body{font-family:system-ui,sans-serif;max-width:720px;margin:1.5rem auto;padding:0 1rem;background:#111;color:#eee}
 h1{font-size:1.25rem}
@@ -341,7 +341,7 @@ input[type=number]{width:4.5rem;font-size:1rem;padding:.35rem .5rem;border-radiu
 </style>
 </head>
 <body>
-<h1>MyScreen</h1>
+<h1>LifeTiles</h1>
 <p class="muted">Images are resized in your browser (800x480). Animated GIFs become <code>.seq</code> with evenly subsampled JPEG frames; first GIF needs internet for the decoder. Ready-made <code>.seq</code> may use more frames.</p>
 <div class="card">
 <h2>Message board</h2>

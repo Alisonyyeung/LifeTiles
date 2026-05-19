@@ -16,6 +16,7 @@
 #include "main_screen.h"
 #include "quote_likes_storage.h"
 #include "quotes_api.h"
+#include "region_config.h"
 #include "screen_nav.h"
 #include "weather_api.h"
 #include "wifi_manager.h"
@@ -98,6 +99,7 @@ void setup()
     display_backlight_load();
     app_theme_load();
     user_profile_load();
+    region_config_init();
     wifi_storage_init();
     net_mutex_init();
 

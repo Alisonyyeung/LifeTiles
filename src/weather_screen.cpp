@@ -5,6 +5,8 @@
 #include <stdio.h>
 
 #include "nav_gestures.h"
+#include "region_config.h"
+#include <stdlib.h>
 #include "screen_nav.h"
 #include "weather_api.h"
 #include "weather_background.h"
@@ -27,6 +29,7 @@
 #define WEATHER_HEADER_ON_DARK     0xFFFFFF
 #define WEATHER_PULL_REFRESH_PX    48
 #define WEATHER_PULL_DEBOUNCE_MS   3000
+#define WEATHER_HINT_Y             52
 /** Solid backdrop while fetching (no photo JPEG yet). */
 #define WEATHER_REFRESH_BG         0xA8D4F0
 
@@ -74,6 +77,8 @@ static lv_obj_t *forecast_page_swipe_hint;
 static bool screen_ready = false;
 static int forecast_page_count = WEATHER_FORECAST_DAYS;
 static uint32_t s_last_pull_refresh_ms = 0;
+static lv_point_t s_pull_start;
+static bool s_pull_tracking = false;
 
 static void weather_clear_widget_ptrs(void)
 {
@@ -300,7 +305,8 @@ static void apply_weather_appearance(bool is_day)
     style_weather_card(forecast_panel, card_p->card);
 
     style_text_on_panel(label_title, p, &lv_font_montserrat_30, header_color, LV_TEXT_ALIGN_CENTER);
-    style_text_on_panel(label_hint, p, &lv_font_montserrat_14, hint_color, LV_TEXT_ALIGN_CENTER);
+    style_text_on_panel(label_hint, p, &lv_font_montserrat_14,
+                        day_bg ? p->text_secondary : hint_color, LV_TEXT_ALIGN_CENTER);
     style_text_on_panel(label_current_heading, card_p, &lv_font_montserrat_20, card_p->text_muted,
                         LV_TEXT_ALIGN_CENTER);
     style_text_on_panel(label_current_temp, card_p, &lv_font_montserrat_48, card_p->text_primary,
@@ -332,6 +338,75 @@ static void apply_weather_appearance(bool is_day)
     }
 }
 
+static int weather_iabs(int v)
+{
+    return v < 0 ? -v : v;
+}
+
+static void weather_screen_set_refresh_hint(void)
+{
+    if (!label_hint) {
+        return;
+    }
+    lv_label_set_text(label_hint, "Swipe down to refresh");
+}
+
+static void trigger_weather_pull_refresh(void)
+{
+    const uint32_t now = millis();
+    if (now - s_last_pull_refresh_ms < WEATHER_PULL_DEBOUNCE_MS) {
+        return;
+    }
+    s_last_pull_refresh_ms = now;
+
+    Serial.println("Weather: pull-to-refresh");
+    weather_screen_set_loading();
+    weather_api_request_refresh();
+}
+
+static bool pull_swipe_down(int dx, int dy)
+{
+    return dy >= WEATHER_PULL_REFRESH_PX && dy > weather_iabs(dx) * 2;
+}
+
+static void weather_screen_pull_event(lv_event_t *e)
+{
+    const lv_event_code_t code = lv_event_get_code(e);
+    lv_indev_t *indev = lv_indev_get_act();
+    if (!indev || !screen) {
+        return;
+    }
+
+    if (code == LV_EVENT_PRESSED) {
+        lv_indev_get_point(indev, &s_pull_start);
+        s_pull_tracking = true;
+        return;
+    }
+
+    if (code == LV_EVENT_GESTURE) {
+        if (lv_indev_get_gesture_dir(indev) == LV_DIR_BOTTOM) {
+            trigger_weather_pull_refresh();
+        }
+        return;
+    }
+
+    if (code == LV_EVENT_RELEASED && s_pull_tracking) {
+        lv_point_t p;
+        lv_indev_get_point(indev, &p);
+        const int dx = (int)(p.x - s_pull_start.x);
+        const int dy = (int)(p.y - s_pull_start.y);
+        s_pull_tracking = false;
+        if (pull_swipe_down(dx, dy)) {
+            trigger_weather_pull_refresh();
+        }
+        return;
+    }
+
+    if (code == LV_EVENT_PRESS_LOST) {
+        s_pull_tracking = false;
+    }
+}
+
 static void forecast_pull_refresh_event(lv_event_t *e)
 {
     if (lv_event_get_code(e) != LV_EVENT_SCROLL_END) {
@@ -343,17 +418,26 @@ static void forecast_pull_refresh_event(lv_event_t *e)
         return;
     }
 
-    const uint32_t now = millis();
-    if (now - s_last_pull_refresh_ms < WEATHER_PULL_DEBOUNCE_MS) {
-        lv_obj_scroll_to_y(page, 0, LV_ANIM_ON);
+    trigger_weather_pull_refresh();
+    lv_obj_scroll_to_y(page, 0, LV_ANIM_ON);
+}
+
+static void weather_enable_pull_detection(void)
+{
+    if (!screen) {
         return;
     }
-    s_last_pull_refresh_ms = now;
-
-    Serial.println("Weather: pull-to-refresh");
-    weather_screen_set_loading();
-    weather_api_request_refresh();
-    lv_obj_scroll_to_y(page, 0, LV_ANIM_ON);
+    nav_gestures_enable_tree_bubble(screen);
+    lv_obj_add_event_cb(screen, weather_screen_pull_event, LV_EVENT_ALL, NULL);
+    if (current_panel) {
+        lv_obj_add_event_cb(current_panel, weather_screen_pull_event, LV_EVENT_ALL, NULL);
+    }
+    if (forecast_panel) {
+        lv_obj_add_event_cb(forecast_panel, weather_screen_pull_event, LV_EVENT_ALL, NULL);
+    }
+    if (forecast_viewport) {
+        lv_obj_add_event_cb(forecast_viewport, weather_screen_pull_event, LV_EVENT_ALL, NULL);
+    }
 }
 
 static void forecast_scroll_event(lv_event_t *e)
@@ -483,14 +567,14 @@ void weather_screen_init(void)
     nav_create_close_btn(screen);
 
     label_title = lv_label_create(screen);
-    lv_label_set_text(label_title, "Hong Kong");
+    lv_label_set_text(label_title, region_config_get()->name);
     style_text_on_panel(label_title, p, &lv_font_montserrat_30, p->text_primary, LV_TEXT_ALIGN_CENTER);
     lv_obj_align(label_title, LV_ALIGN_TOP_MID, 0, 12);
 
     label_hint = lv_label_create(screen);
-    lv_label_set_text(label_hint, "Tap " LV_SYMBOL_CLOSE " for home");
-    style_text_on_panel(label_hint, p, &lv_font_montserrat_14, p->text_muted, LV_TEXT_ALIGN_CENTER);
-    lv_obj_align(label_hint, LV_ALIGN_TOP_MID, 0, 46);
+    weather_screen_set_refresh_hint();
+    style_text_on_panel(label_hint, p, &lv_font_montserrat_14, p->text_secondary, LV_TEXT_ALIGN_CENTER);
+    lv_obj_align(label_hint, LV_ALIGN_TOP_MID, 0, WEATHER_HINT_Y);
 
     current_panel = lv_obj_create(screen);
     lv_obj_set_size(current_panel, WEATHER_PANEL_W, WEATHER_PANEL_H);
@@ -547,7 +631,7 @@ void weather_screen_init(void)
     lv_obj_align(label_forecast_page, LV_ALIGN_TOP_RIGHT, -4, 2);
 
     label_forecast_swipe = lv_label_create(forecast_panel);
-    lv_label_set_text(label_forecast_swipe, "Swipe down to refresh");
+    lv_label_set_text(label_forecast_swipe, "Swipe left/right for days");
     style_text_on_panel(label_forecast_swipe, p, &lv_font_montserrat_14, p->text_muted, LV_TEXT_ALIGN_CENTER);
     lv_obj_align(label_forecast_swipe, LV_ALIGN_TOP_MID, 0, 22);
 
@@ -567,8 +651,24 @@ void weather_screen_init(void)
         forecast_pages[i] = create_forecast_page(forecast_viewport, i);
     }
 
+    if (label_title) {
+        lv_obj_move_foreground(label_title);
+    }
+    if (label_hint) {
+        lv_obj_move_foreground(label_hint);
+    }
+
+    weather_enable_pull_detection();
     lv_obj_add_event_cb(screen, weather_screen_unloaded_cb, LV_EVENT_ALL, NULL);
     screen_ready = true;
+}
+
+void weather_screen_update_location_title(void)
+{
+    if (!screen_ready || !label_title) {
+        return;
+    }
+    lv_label_set_text(label_title, region_config_get()->name);
 }
 
 bool weather_screen_is_ready(void)
@@ -603,6 +703,8 @@ void weather_screen_show(void)
         weather_screen_init();
     }
 
+    weather_screen_update_location_title();
+
     if (forecast_viewport) {
         lv_obj_scroll_to_x(forecast_viewport, 0, LV_ANIM_OFF);
     }
@@ -616,8 +718,8 @@ void weather_screen_show(void)
         weather_screen_set_loading();
     } else {
         weather_screen_set_loading();
-        lv_label_set_text(label_current_desc, "Swipe down on forecast to refresh");
     }
+    weather_screen_set_refresh_hint();
 }
 
 void weather_screen_set_loading(void)
@@ -640,6 +742,7 @@ void weather_screen_set_loading(void)
                         LV_TEXT_ALIGN_CENTER);
     style_text_on_panel(label_current_desc, card_p, &lv_font_montserrat_20, card_p->text_muted,
                         LV_TEXT_ALIGN_CENTER);
+    weather_screen_set_refresh_hint();
 
     for (int i = 0; i < WEATHER_FORECAST_DAYS; ++i) {
         lv_label_set_text(forecast_page_day[i], "");

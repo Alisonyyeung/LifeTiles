@@ -1,15 +1,15 @@
-# Comment board Chinese font (Traditional)
+# Message board Chinese font (Traditional)
 
 The device uses a **custom LVGL bitmap font** (`comment_cjk_24`, 24px) for the comment screen.
 
 ## Recommended typefaces (free / open license)
 
-| Font | License | Download |
-|------|---------|----------|
-| **Noto Sans TC** (default in build script) | [OFL](https://scripts.sil.org/OFL) | [Google Fonts](https://fonts.google.com/noto/specimen/Noto+Sans+TC) |
-| **Source Han Sans TC** | [OFL](https://scripts.sil.org/OFL) | [Adobe / GitHub](https://github.com/adobe-fonts/source-han-sans) |
-| **cwTeXHei** | GPL | [CTAN / cwTeX](https://github.com/LinYuanRu/cwte-x-hei) |
-| **全字庫正楷體** | [Open Government License (Taiwan)](https://www.gov.tw/copyright) | [CNS 11643](https://www.cns11643.gov.tw/) |
+| Font                                       | License                                                          | Download                                                            |
+| ------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **Noto Sans TC** (default in build script) | [OFL](https://scripts.sil.org/OFL)                               | [Google Fonts](https://fonts.google.com/noto/specimen/Noto+Sans+TC) |
+| **Source Han Sans TC**                     | [OFL](https://scripts.sil.org/OFL)                               | [Adobe / GitHub](https://github.com/adobe-fonts/source-han-sans)    |
+| **cwTeXHei**                               | GPL                                                              | [CTAN / cwTeX](https://github.com/LinYuanRu/cwte-x-hei)             |
+| **全字庫正楷體**                           | [Open Government License (Taiwan)](https://www.gov.tw/copyright) | [CNS 11643](https://www.cns11643.gov.tw/)                           |
 
 For **Simplified** Chinese, use Noto Sans SC and change `tools/gen_comment_cjk_font.py` to point at the SC font paths.
 

@@ -21,6 +21,7 @@ void weather_screen_init(void);
 void weather_screen_destroy(void);
 bool weather_screen_is_ready(void);
 void weather_screen_show(void);
+void weather_screen_update_location_title(void);
 lv_obj_t *weather_screen_get_screen(void);
 
 void weather_screen_set_loading(void);

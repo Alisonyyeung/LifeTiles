@@ -344,7 +344,7 @@ input[type=number]{width:4.5rem;font-size:1rem;padding:.35rem .5rem;border-radiu
 <h1>MyScreen</h1>
 <p class="muted">Images are resized in your browser (800x480). Animated GIFs become <code>.seq</code> with evenly subsampled JPEG frames; first GIF needs internet for the decoder. Ready-made <code>.seq</code> may use more frames.</p>
 <div class="card">
-<h2>Comment board</h2>
+<h2>Message board</h2>
 <p class="muted">English, Chinese, or preset emoji. Pick a bubble style for the device <strong>Message</strong> screen.</p>
 <div class="emoji-bar" id="emojiBar"></div>
 <textarea id="commentText" maxlength="512" placeholder="Write a message..."></textarea>

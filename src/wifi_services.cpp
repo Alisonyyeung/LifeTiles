@@ -8,18 +8,17 @@
 #include "lvgl_port.h"
 #include "main_screen.h"
 #include "quotes_api.h"
+#include "region_config.h"
 #include "weather_api.h"
 #include "wifi_storage.h"
 
-#define HK_TIMEZONE    "HKT-8"
 #define NTP_SERVER_1   "pool.ntp.org"
 #define NTP_SERVER_2   "time.google.com"
 
-static bool sync_hk_time(void)
+static bool sync_region_time(void)
 {
     configTime(0, 0, NTP_SERVER_1, NTP_SERVER_2);
-    setenv("TZ", HK_TIMEZONE, 1);
-    tzset();
+    region_config_apply_timezone();
 
     struct tm timeinfo;
     for (int i = 0; i < 12; ++i) {
@@ -37,10 +36,10 @@ static void connected_services_task(void *arg)
 
     wifi_storage_history_record_connected();
 
-    const bool time_ok = sync_hk_time();
+    const bool time_ok = sync_region_time();
 
     lvgl_port_lock(-1);
-    main_screen_set_status(time_ok ? "HKT" : "NTP pending");
+    main_screen_set_status(time_ok ? region_config_clock_abbrev() : "NTP pending");
     lvgl_port_unlock();
 
     image_upload_server_restart();

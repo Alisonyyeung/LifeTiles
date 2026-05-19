@@ -9,8 +9,11 @@
 #include "display_backlight.h"
 #include "main_screen.h"
 #include "nav_gestures.h"
+#include "region_config.h"
 #include "screen_nav.h"
 #include "user_profile.h"
+#include "weather_api.h"
+#include "weather_screen.h"
 #include "lvgl_port.h"
 #include "wifi_manager.h"
 #include "wifi_services.h"
@@ -40,9 +43,29 @@ static lv_obj_t *btn_theme_light;
 static lv_obj_t *lbl_theme_light;
 static lv_obj_t *label_theme_hint;
 static lv_obj_t *ta_username;
+static lv_obj_t *dd_region;
+static lv_obj_t *row_region_fields;
+static lv_obj_t *ta_region_name;
+static lv_obj_t *ta_region_lat;
+static lv_obj_t *ta_region_lon;
+static lv_obj_t *ta_region_tz_iana;
+static lv_obj_t *ta_region_tz_posix;
+static lv_obj_t *btn_save_region;
+static lv_obj_t *lbl_save_region;
+static lv_obj_t *label_region_status;
 static lv_obj_t *keyboard;
 static lv_obj_t *settings_card;
 static lv_obj_t *settings_scroll;
+
+static const char REGION_DROPDOWN_OPTS[] =
+    "Hong Kong\n"
+    "Tokyo\n"
+    "Singapore\n"
+    "London\n"
+    "New York\n"
+    "Los Angeles\n"
+    "Sydney\n"
+    "Custom";
 
 static bool screen_ready = false;
 
@@ -71,6 +94,16 @@ static void settings_clear_widget_ptrs(void)
     lbl_theme_light = NULL;
     label_theme_hint = NULL;
     ta_username = NULL;
+    dd_region = NULL;
+    row_region_fields = NULL;
+    ta_region_name = NULL;
+    ta_region_lat = NULL;
+    ta_region_lon = NULL;
+    ta_region_tz_iana = NULL;
+    ta_region_tz_posix = NULL;
+    btn_save_region = NULL;
+    lbl_save_region = NULL;
+    label_region_status = NULL;
     keyboard = NULL;
     settings_card = NULL;
     settings_scroll = NULL;
@@ -337,6 +370,21 @@ static void hide_keyboard(void)
     if (ta_username) {
         lv_obj_clear_state(ta_username, LV_STATE_FOCUSED);
     }
+    if (ta_region_name) {
+        lv_obj_clear_state(ta_region_name, LV_STATE_FOCUSED);
+    }
+    if (ta_region_lat) {
+        lv_obj_clear_state(ta_region_lat, LV_STATE_FOCUSED);
+    }
+    if (ta_region_lon) {
+        lv_obj_clear_state(ta_region_lon, LV_STATE_FOCUSED);
+    }
+    if (ta_region_tz_iana) {
+        lv_obj_clear_state(ta_region_tz_iana, LV_STATE_FOCUSED);
+    }
+    if (ta_region_tz_posix) {
+        lv_obj_clear_state(ta_region_tz_posix, LV_STATE_FOCUSED);
+    }
 }
 
 static void focus_ta(lv_obj_t *ta)
@@ -375,6 +423,167 @@ static void refresh_username_field(void)
     char name[USER_PROFILE_NAME_MAX];
     user_profile_get_stored(name, sizeof(name));
     lv_textarea_set_text(ta_username, name);
+}
+
+static void set_region_fields_enabled(bool enabled)
+{
+    lv_obj_t *fields[] = {ta_region_name, ta_region_lat, ta_region_lon, ta_region_tz_iana,
+                          ta_region_tz_posix};
+    for (size_t i = 0; i < sizeof(fields) / sizeof(fields[0]); ++i) {
+        if (!fields[i]) {
+            continue;
+        }
+        if (enabled) {
+            lv_obj_clear_state(fields[i], LV_STATE_DISABLED);
+        } else {
+            lv_obj_add_state(fields[i], LV_STATE_DISABLED);
+        }
+    }
+}
+
+static void fill_region_textareas(const region_config_t *cfg)
+{
+    if (!cfg) {
+        return;
+    }
+    char buf[24];
+    if (ta_region_name) {
+        lv_textarea_set_text(ta_region_name, cfg->name);
+    }
+    if (ta_region_lat) {
+        snprintf(buf, sizeof(buf), "%.2f", cfg->latitude);
+        lv_textarea_set_text(ta_region_lat, buf);
+    }
+    if (ta_region_lon) {
+        snprintf(buf, sizeof(buf), "%.2f", cfg->longitude);
+        lv_textarea_set_text(ta_region_lon, buf);
+    }
+    if (ta_region_tz_iana) {
+        lv_textarea_set_text(ta_region_tz_iana, cfg->tz_iana);
+    }
+    if (ta_region_tz_posix) {
+        lv_textarea_set_text(ta_region_tz_posix, cfg->tz_posix);
+    }
+}
+
+static void refresh_region_fields(void)
+{
+    if (!dd_region) {
+        return;
+    }
+    region_config_load();
+    const region_config_t *cfg = region_config_get();
+    const int preset = region_config_match_preset_index(cfg);
+    const int custom_idx = region_config_preset_count();
+    lv_dropdown_set_selected(dd_region, preset >= 0 ? (uint16_t)preset : (uint16_t)custom_idx);
+    fill_region_textareas(cfg);
+    set_region_fields_enabled(preset == REGION_PRESET_CUSTOM);
+    if (label_region_status) {
+        lv_label_set_text(label_region_status, "");
+    }
+}
+
+static void on_region_dropdown_changed(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED || !dd_region) {
+        return;
+    }
+    const uint16_t sel = lv_dropdown_get_selected(dd_region);
+    const int custom_idx = region_config_preset_count();
+    if ((int)sel < custom_idx) {
+        region_config_t cfg;
+        region_config_apply_preset((int)sel);
+        cfg = *region_config_get();
+        fill_region_textareas(&cfg);
+        set_region_fields_enabled(false);
+    } else {
+        set_region_fields_enabled(true);
+    }
+}
+
+static bool parse_coord(const char *text, float *out)
+{
+    if (!text || text[0] == '\0' || !out) {
+        return false;
+    }
+    char *end = nullptr;
+    const float v = strtof(text, &end);
+    if (end == text) {
+        return false;
+    }
+    *out = v;
+    return true;
+}
+
+static void on_save_region(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) {
+        return;
+    }
+
+    region_config_t cfg;
+    memset(&cfg, 0, sizeof(cfg));
+
+    const char *name = ta_region_name ? lv_textarea_get_text(ta_region_name) : "";
+    const char *lat_s = ta_region_lat ? lv_textarea_get_text(ta_region_lat) : "";
+    const char *lon_s = ta_region_lon ? lv_textarea_get_text(ta_region_lon) : "";
+    const char *tz_iana = ta_region_tz_iana ? lv_textarea_get_text(ta_region_tz_iana) : "";
+    const char *tz_posix = ta_region_tz_posix ? lv_textarea_get_text(ta_region_tz_posix) : "";
+
+    if (!name || name[0] == '\0') {
+        if (label_region_status) {
+            lv_label_set_text(label_region_status, "Enter a location name.");
+        }
+        return;
+    }
+    if (!parse_coord(lat_s, &cfg.latitude) || cfg.latitude < -90.0f || cfg.latitude > 90.0f) {
+        if (label_region_status) {
+            lv_label_set_text(label_region_status, "Enter a valid latitude (-90 to 90).");
+        }
+        return;
+    }
+    if (!parse_coord(lon_s, &cfg.longitude) || cfg.longitude < -180.0f || cfg.longitude > 180.0f) {
+        if (label_region_status) {
+            lv_label_set_text(label_region_status, "Enter a valid longitude (-180 to 180).");
+        }
+        return;
+    }
+    if (!tz_iana || tz_iana[0] == '\0') {
+        if (label_region_status) {
+            lv_label_set_text(label_region_status, "Enter a timezone (e.g. Asia/Hong_Kong).");
+        }
+        return;
+    }
+    if (!tz_posix || tz_posix[0] == '\0') {
+        if (label_region_status) {
+            lv_label_set_text(label_region_status, "Enter POSIX TZ (e.g. HKT-8).");
+        }
+        return;
+    }
+
+    strncpy(cfg.name, name, sizeof(cfg.name) - 1);
+    strncpy(cfg.tz_iana, tz_iana, sizeof(cfg.tz_iana) - 1);
+    strncpy(cfg.tz_posix, tz_posix, sizeof(cfg.tz_posix) - 1);
+
+    if (!region_config_save(&cfg)) {
+        if (label_region_status) {
+            lv_label_set_text(label_region_status, "Could not save region.");
+        }
+        return;
+    }
+
+    region_config_apply_timezone();
+    hide_keyboard();
+    weather_screen_update_location_title();
+    weather_api_request_refresh();
+
+    if (WiFi.status() == WL_CONNECTED) {
+        main_screen_set_status(region_config_clock_abbrev());
+    }
+
+    if (label_region_status) {
+        lv_label_set_text(label_region_status, "Saved. Weather will refresh.");
+    }
 }
 
 static void on_brightness_changed(lv_event_t *e)
@@ -513,6 +722,86 @@ void settings_screen_init(void)
     lv_obj_set_style_text_color(lbl_name_hint, lv_color_hex(c->text_muted), LV_PART_MAIN);
     lv_label_set_long_mode(lbl_name_hint, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(lbl_name_hint, lv_pct(100));
+
+    lv_obj_t *row_region = lv_obj_create(settings_card);
+    lv_obj_set_width(row_region, lv_pct(100));
+    lv_obj_set_height(row_region, LV_SIZE_CONTENT);
+    lv_obj_clear_flag(row_region, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_opa(row_region, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(row_region, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(row_region, 0, LV_PART_MAIN);
+    lv_obj_set_flex_flow(row_region, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(row_region, 8, LV_PART_MAIN);
+
+    lv_obj_t *lbl_region = lv_label_create(row_region);
+    lv_label_set_text(lbl_region, "Region (time & weather)");
+    lv_obj_set_style_text_font(lbl_region, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_region, lv_color_hex(c->text_muted), LV_PART_MAIN);
+
+    dd_region = lv_dropdown_create(row_region);
+    lv_obj_set_width(dd_region, lv_pct(100));
+    lv_dropdown_set_options(dd_region, REGION_DROPDOWN_OPTS);
+    lv_obj_set_style_text_font(dd_region, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_add_event_cb(dd_region, on_region_dropdown_changed, LV_EVENT_VALUE_CHANGED, NULL);
+
+    row_region_fields = lv_obj_create(row_region);
+    lv_obj_set_width(row_region_fields, lv_pct(100));
+    lv_obj_set_height(row_region_fields, LV_SIZE_CONTENT);
+    lv_obj_clear_flag(row_region_fields, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_opa(row_region_fields, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(row_region_fields, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(row_region_fields, 0, LV_PART_MAIN);
+    lv_obj_set_flex_flow(row_region_fields, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(row_region_fields, 6, LV_PART_MAIN);
+
+#define REGION_FIELD(label_text, ta_ptr, placeholder, max_len)                                         \
+    do {                                                                                               \
+        lv_obj_t *lbl = lv_label_create(row_region_fields);                                            \
+        lv_label_set_text(lbl, label_text);                                                            \
+        lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, LV_PART_MAIN);                       \
+        lv_obj_set_style_text_color(lbl, lv_color_hex(c->text_muted), LV_PART_MAIN);                  \
+        ta_ptr = lv_textarea_create(row_region_fields);                                                \
+        lv_obj_set_width(ta_ptr, lv_pct(100));                                                         \
+        lv_obj_set_height(ta_ptr, 40);                                                                 \
+        lv_textarea_set_one_line(ta_ptr, true);                                                        \
+        lv_textarea_set_max_length(ta_ptr, max_len);                                                   \
+        lv_textarea_set_placeholder_text(ta_ptr, placeholder);                                         \
+        app_theme_style_textarea(ta_ptr);                                                              \
+        lv_obj_add_event_cb(ta_ptr, on_ta_focus, LV_EVENT_FOCUSED, NULL);                              \
+    } while (0)
+
+    REGION_FIELD("Display name", ta_region_name, "Hong Kong", REGION_NAME_MAX - 1);
+    REGION_FIELD("Latitude", ta_region_lat, "22.32", 12);
+    REGION_FIELD("Longitude", ta_region_lon, "114.17", 12);
+    REGION_FIELD("Timezone (IANA)", ta_region_tz_iana, "Asia/Hong_Kong", REGION_TZ_IANA_MAX - 1);
+    REGION_FIELD("POSIX TZ (clock)", ta_region_tz_posix, "HKT-8", REGION_TZ_POSIX_MAX - 1);
+#undef REGION_FIELD
+
+    lv_obj_t *lbl_region_hint = lv_label_create(row_region);
+    lv_label_set_text(lbl_region_hint,
+                      "Pick a city or choose Custom to edit all fields. POSIX TZ sets the clock.");
+    lv_obj_set_style_text_font(lbl_region_hint, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_region_hint, lv_color_hex(c->text_muted), LV_PART_MAIN);
+    lv_label_set_long_mode(lbl_region_hint, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(lbl_region_hint, lv_pct(100));
+
+    btn_save_region = lv_btn_create(row_region);
+    lv_obj_set_width(btn_save_region, lv_pct(100));
+    lv_obj_set_height(btn_save_region, 44);
+    lbl_save_region = lv_label_create(btn_save_region);
+    lv_label_set_text(lbl_save_region, "Save region");
+    lv_obj_center(lbl_save_region);
+    app_theme_style_action_btn(btn_save_region, lbl_save_region);
+    lv_obj_add_event_cb(btn_save_region, on_save_region, LV_EVENT_CLICKED, NULL);
+
+    label_region_status = lv_label_create(row_region);
+    lv_label_set_text(label_region_status, "");
+    lv_obj_set_style_text_font(label_region_status, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_set_style_text_color(label_region_status, lv_color_hex(c->text_muted), LV_PART_MAIN);
+    lv_label_set_long_mode(label_region_status, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(label_region_status, lv_pct(100));
+
+    refresh_region_fields();
 
     lv_obj_t *row_ip = lv_obj_create(settings_card);
     lv_obj_set_width(row_ip, lv_pct(100));
@@ -803,6 +1092,7 @@ void settings_screen_show(void)
     load_static_fields();
     autofill_static_from_wifi(true);
     refresh_username_field();
+    refresh_region_fields();
     hide_keyboard();
     const uint8_t pct = display_backlight_get_percent();
     lv_slider_set_value(slider_brightness, pct, LV_ANIM_OFF);
@@ -848,6 +1138,27 @@ void settings_screen_apply_theme(void)
     }
     if (ta_username) {
         app_theme_style_textarea(ta_username);
+    }
+    if (ta_region_name) {
+        app_theme_style_textarea(ta_region_name);
+    }
+    if (ta_region_lat) {
+        app_theme_style_textarea(ta_region_lat);
+    }
+    if (ta_region_lon) {
+        app_theme_style_textarea(ta_region_lon);
+    }
+    if (ta_region_tz_iana) {
+        app_theme_style_textarea(ta_region_tz_iana);
+    }
+    if (ta_region_tz_posix) {
+        app_theme_style_textarea(ta_region_tz_posix);
+    }
+    if (btn_save_region) {
+        app_theme_style_action_btn(btn_save_region, lbl_save_region);
+    }
+    if (label_region_status) {
+        lv_obj_set_style_text_color(label_region_status, lv_color_hex(c->text_muted), LV_PART_MAIN);
     }
     if (ta_static_ip) {
         app_theme_style_textarea(ta_static_ip);

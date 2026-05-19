@@ -11,16 +11,11 @@
 #include <time.h>
 
 #include "main_screen.h"
+#include "region_config.h"
 #include "weather_icons.h"
 #include "weather_screen.h"
 
-#define WEATHER_API_URL       "https://api.open-meteo.com/v1/forecast?" \
-                              "latitude=22.32&longitude=114.17" \
-                              "&current=temperature_2m,relative_humidity_2m,weather_code," \
-                              "wind_speed_10m,is_day" \
-                              "&hourly=temperature_2m,weather_code,is_day" \
-                              "&daily=weather_code,temperature_2m_max,temperature_2m_min" \
-                              "&timezone=Asia%2FHong_Kong&forecast_days=7&forecast_hours=24"
+#define WEATHER_URL_MAX       384
 #define WEATHER_JSON_CAPACITY 16384
 
 struct SpiRamAllocator {
@@ -311,13 +306,19 @@ static bool apply_weather_from_doc(WeatherJsonDocument &doc)
     return true;
 }
 
-static bool fetch_hong_kong_weather(void)
+static bool fetch_region_weather(void)
 {
+    char url[WEATHER_URL_MAX];
+    if (!region_config_build_weather_url(url, sizeof(url))) {
+        Serial.println("Weather: invalid region URL");
+        return false;
+    }
+
     net_prepare_https(WEATHER_SSL_MIN_HEAP);
 
     char *body = nullptr;
     size_t body_len = 0;
-    if (!net_https_get_ex(WEATHER_API_URL, &body, &body_len, WEATHER_HTTP_TIMEOUT, WEATHER_SSL_MIN_HEAP)) {
+    if (!net_https_get_ex(url, &body, &body_len, WEATHER_HTTP_TIMEOUT, WEATHER_SSL_MIN_HEAP)) {
         Serial.println("Weather: HTTPS fetch failed");
         return false;
     }
@@ -380,7 +381,7 @@ static void weather_worker_task(void *arg)
         lvgl_unlock();
 
         Serial.println("Weather: fetching forecast");
-        if (!fetch_hong_kong_weather()) {
+        if (!fetch_region_weather()) {
             if (!s_cache.valid) {
                 lvgl_lock();
                 weather_screen_set_error("Could not load weather");

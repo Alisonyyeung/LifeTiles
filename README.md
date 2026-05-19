@@ -10,12 +10,12 @@ Firmware for the [Waveshare ESP32-S3-Touch-LCD-4.3](https://www.waveshare.com/wi
 
 | Area         | What you get                                                                                      |
 | ------------ | ------------------------------------------------------------------------------------------------- |
-| **Home**     | Greeting with your name, live clock (HKT), daily quote (Quotable), weather shortcut, liked quotes |
+| **Home**     | Greeting with your name, live clock (your region’s timezone), daily quote (Quotable), weather shortcut, liked quotes |
 | **Image**    | Slideshow of photos/animations from LittleFS (JPEG, PNG, WebP, GIF→`.seq`)                        |
 | **To-Do**    | Up to 10 tasks on-device; sync via web API                                                        |
 | **Message**  | Styled personal message board (dialogue, festive, love, warning), emoji, marquee                  |
-| **Weather**  | 7-day forecast + hourly strip (Open-Meteo, no API key)                                            |
-| **Settings** | Wi‑Fi (saved networks, static IP), brightness, dark/light theme, display name                     |
+| **Weather**  | 7-day forecast + hourly strip for your region (Open-Meteo, no API key); swipe down to refresh       |
+| **Settings** | Region (time & weather), Wi‑Fi (saved networks, static IP), brightness, dark/light theme, display name |
 | **Web UI**   | Upload images, edit message & todos, preview storage — at `http://<device-ip>/`                   |
 
 ---
@@ -50,8 +50,8 @@ Four main tiles live in a horizontal **LVGL tileview**. Swipe left/right between
 | **Image**    | Swipe right from Home       | Cycle images; animated `.seq` from GIFs; tap for viewer                                   |
 | **To-Do**    | Swipe right from Image      | Check off tasks; encouragement on complete                                                |
 | **Message**  | Swipe left from Home        | Bubble styles, font size, scroll/marquee, colored emoji                                   |
-| **Weather**  | Menu or Home → weather icon | Forecast, backgrounds, Google-style icons                                                 |
-| **Settings** | Menu or Home → gear         | Wi‑Fi, static IP, brightness, theme, username                                             |
+| **Weather**  | Menu or Home → weather icon | Forecast for saved region, backgrounds, Google-style icons; pull down to refresh          |
+| **Settings** | Menu or Home → gear         | Region presets or custom lat/lon/timezone, Wi‑Fi, static IP, brightness, theme, username   |
 | **Wi‑Fi**    | Settings → edit Wi‑Fi       | SSID/password, up to 3 saved networks, show-password toggle                               |
 
 Overlay screens (Settings, Weather, Wi‑Fi) slide in from the right; close control returns to the tileview.
@@ -71,6 +71,7 @@ LifeTiles/
 │   ├── comment_screen.cpp  # Message board UI
 │   ├── weather_screen.cpp  # Weather UI
 │   ├── settings_screen.cpp
+│   ├── region_config.cpp     # Location/timezone presets + NVS (weather + clock)
 │   ├── wifi_settings_screen.cpp
 │   ├── image_upload_server.cpp  # HTTP server + web UI
 │   ├── wifi_manager.cpp / wifi_storage.cpp
@@ -139,7 +140,48 @@ The built-in page at `http://<device-ip>/` lets you manage content without refla
 | `/api/comment`                    | GET/POST | Read/write message board                      |
 | `/api/todos`                      | GET/POST | Read/write to-do list (JSON)                  |
 
-On connect, the firmware syncs **NTP** (Hong Kong time), fetches **today’s quote**, and restarts the HTTP server so the IP stays correct after network changes.
+On connect, the firmware syncs **NTP** using your saved **region timezone**, fetches **today’s quote**, refreshes **weather** for that region, and restarts the HTTP server so the IP stays correct after network changes.
+
+---
+
+## Region (time & weather)
+
+Set your location on the device under **Settings → Region (time & weather)**. The same region drives:
+
+- **Home clock** and status label (POSIX timezone via `TZ`)
+- **Quote of the day** day boundary (local calendar day)
+- **Weather** title, coordinates, and Open-Meteo forecast/hourly data (IANA timezone in the API URL)
+
+### Preset cities
+
+| Preset        | Display name | Lat / Lon      | IANA timezone        |
+| ------------- | ------------ | -------------- | -------------------- |
+| Hong Kong     | Hong Kong    | 22.32, 114.17  | `Asia/Hong_Kong`   |
+| Tokyo         | Tokyo        | 35.68, 139.69  | `Asia/Tokyo`       |
+| Singapore     | Singapore    | 1.35, 103.82   | `Asia/Singapore`   |
+| London        | London       | 51.51, -0.13   | `Europe/London`    |
+| New York      | New York     | 40.71, -74.01  | `America/New_York` |
+| Los Angeles   | Los Angeles  | 34.05, -118.24 | `America/Los_Angeles` |
+| Sydney        | Sydney       | -33.87, 151.21 | `Australia/Sydney` |
+
+Pick a preset from the dropdown, or choose **Custom** to edit all fields manually, then tap **Save region**. Weather refreshes after save (Wi‑Fi required). Default on first boot is **Hong Kong**.
+
+### Custom fields
+
+| Field | Purpose |
+| ----- | ------- |
+| **Display name** | Shown as the weather screen title (e.g. `Seoul`) |
+| **Latitude / Longitude** | Open-Meteo forecast location (−90…90, −180…180) |
+| **Timezone (IANA)** | Passed to Open-Meteo (e.g. `Asia/Seoul`) |
+| **POSIX TZ (clock)** | Device clock & NTP local time (e.g. `KST-9` or `EST5EDT,M3.2.0,M11.1.0`) |
+
+Find IANA names at [Open-Meteo timezone list](https://open-meteo.com/en/docs) or [tz database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). POSIX strings follow `man tzset` / ESP-IDF `setenv("TZ", …)` rules.
+
+### Weather refresh
+
+On the **Weather** screen, **swipe down** (mostly vertical) on the panels or pull down on today’s forecast scroll at the top to request a new fetch. A hint under the city name reads “Swipe down to refresh.”
+
+Implementation: `include/region_config.h`, `src/region_config.cpp`, `src/settings_screen.cpp`, `src/weather_api.cpp`, `src/wifi_services.cpp`.
 
 ---
 
@@ -156,6 +198,9 @@ On connect, the firmware syncs **NTP** (Hong Kong time), fetches **today’s quo
 | `qt_*`                   | Cached “quote of the day”                     |
 | `username`               | Display name for greeting                     |
 | `theme`, `brightness`    | UI preferences                                |
+| `reg_name`, `reg_lat`, `reg_lon` | Region display name and coordinates     |
+| `reg_tziana`, `reg_tzposix` | IANA timezone (weather API) and POSIX TZ (clock) |
+| `reg_preset`             | Last preset index, or custom if no match      |
 
 Wi‑Fi passwords are **not** stored in source code; optional compile-time defaults live in `include/wifi_config.h` (use placeholders for git).
 
@@ -229,9 +274,9 @@ pio device monitor -b 115200
 
 Watch for Wi‑Fi IP and `Image upload UI: http://...`.
 
-### 6. Weather location (optional)
+### 6. Region (optional)
 
-Default forecast is **Hong Kong** (`latitude=22.32`, `longitude=114.17` in `src/weather_api.cpp`). Change those coordinates and the `timezone` query parameter for your city. Open-Meteo does not require an API key.
+Default region is **Hong Kong**. Change it on the device: **Settings → Region (time & weather)** — no firmware edit needed. See **Region (time & weather)** above for presets and custom coordinates. Open-Meteo does not require an API key.
 
 ---
 
@@ -286,5 +331,7 @@ Default forecast is **Hong Kong** (`latitude=22.32`, `longitude=114.17` in `src/
 | Web UI unreachable   | Same LAN as device; use IP from serial log after connect              |
 | GIF won’t animate    | Convert to `.seq` with `tools/gif_to_seq.py` and upload to `/images/` |
 | Quotes/weather empty | Wait for NTP; confirm internet access after Wi‑Fi connects            |
+| Wrong time or weather | Check **Settings → Region**; verify lat/lon and both timezone fields |
+| Weather won’t refresh | Swipe down on weather screen; ensure Wi‑Fi is connected              |
 
 Feedback and contributions welcome.
